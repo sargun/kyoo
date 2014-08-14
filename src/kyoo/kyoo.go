@@ -2,10 +2,12 @@ package kyoo
 
 import "fmt"
 
-import "time"
-import "github.com/hashicorp/memberlist"
 import "flag"
 import "os"
+import "kyoo/memberview"
+import "os/signal"
+
+var stopChan = make(chan int)
 
 const (
 	GetNodeName uint64 = iota
@@ -13,20 +15,13 @@ const (
 
 func Kyoo() int {
 	fmt.Println("Starting kyoo")
-	var bindIp = flag.String("bindip", "127.0.0.1", "IP To bind to")
+
 	hostname, _ := os.Hostname()
 	var nodeName = flag.String("nodename", hostname, "NodeName")
 
 	flag.Parse()
-	config := memberlist.DefaultLocalConfig()
-	config.BindAddr = *bindIp
-	config.Name = *nodeName
-	list, err := memberlist.Create(config)
-	if err != nil {
-		panic("Failed to create memberlist: " + err.Error())
-	}
-	list.Join([]string{"127.0.0.1"})
 
+	memberView := memberview.Create(*nodeName)
 	/*
 		serfClient, _ := client.NewRPCClient("127.0.0.1:7373")
 		// client.Respond(GetNodeName, []byte{1, 2, 3})
@@ -48,13 +43,11 @@ func Kyoo() int {
 			time.Sleep(1 * time.Second)
 		}
 	*/
-	for {
-
-		for _, member := range list.Members() {
-			fmt.Printf("Member: %s %s\n", member.Name, member.Addr)
-		}
-		time.Sleep(1 * time.Second)
-	}
+	//	eventStr := strings.Join([]string{"UserEvent", *nodeName}, " ")
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, os.Interrupt)
+	<-sigchan
+	memberview.Shutdown(memberView)
 	return 0
 
 }
